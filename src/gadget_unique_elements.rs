@@ -97,30 +97,30 @@ mod tests {
             Ok((proof, commitments))
     }
 
-    fn verify_proof_of_uniqueness(set: &[u64], proof: R1CSProof, commitments: Vec<CompressedRistretto>, transcript_label: &'static[u8], pc_gens: &PedersenGens, bp_gens: &BulletproofGens) -> Result<(), R1CSError> {
+    fn verify_proof_of_uniqueness(set_length: usize, proof: R1CSProof, commitments: Vec<CompressedRistretto>, transcript_label: &'static[u8], pc_gens: &PedersenGens, bp_gens: &BulletproofGens) -> Result<(), R1CSError> {
 
         let mut verifier_transcript = Transcript::new(transcript_label);
         let mut verifier = Verifier::new(&mut verifier_transcript);
 
         // set element commitments, as many as the set itself
-        let set_commitments = &commitments[0..set.len()];
+        let set_commitments = &commitments[0..set_length];
 
         /// how many differences do we have? 
         /// For 1st element: n-1 differences
         /// All the way down to (n-1)th element with 1 difference (see explanation in generation step)
         /// That's a partial sum from 1 to n-1, in reverse order
-        let num_of_diff_commitments: usize = get_partial_sum(set.len() - 1);
+        let num_of_diff_commitments: usize = get_partial_sum(set_length - 1);
 
         // diff commitments
-        let diff_commitments = &commitments[set.len()..set.len()+num_of_diff_commitments];
+        let diff_commitments = &commitments[set_length..set_length+num_of_diff_commitments];
         
         // diff inv commitments
-        let diff_inv_commitments = &commitments[set.len()+num_of_diff_commitments..];
+        let diff_inv_commitments = &commitments[set_length+num_of_diff_commitments..];
 
         assert!(diff_commitments.len() == diff_inv_commitments.len());
 
         let mut var_elements = vec![];
-        for i in 0..set.len() {
+        for i in 0..set_length {
             let var_elem = verifier.commit(set_commitments[i]);
             var_elements.push(var_elem);
         }
@@ -129,12 +129,12 @@ mod tests {
         let mut var_diffs_inv = vec![];
 
         // But we also need to verify that the differences actually come from the set itself!
-        for i in 0..set.len() {
+        for i in 0..set_length {
             let allocated_current = AllocatedScalar {
                 variable: var_elements[i],
                 assignment: None
             };
-            for j in i+1..set.len() {
+            for j in i+1..set_length {
                 let allocated_next = AllocatedScalar {
                     variable: var_elements[j],
                     assignment: None
@@ -147,7 +147,7 @@ mod tests {
                 /// This is needed, since the arithmetic progression is in reverse (n-1, n-2, ..., 1)
                 /// [ n*(n-1) - (n-i)*(n-i-1) ] / 2
                 /// This gives the position where differences for i'th element start
-                let i_pos = ((2*set.len() - i - 1) * i) / 2;
+                let i_pos = ((2*set_length - i - 1) * i) / 2;
                 /// now we add the offset for j:
                 let offset = j - i - 1;
                 /// and combine
@@ -205,7 +205,7 @@ mod tests {
 
         let (proof, commitments) = gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
         // assert!(verify_proof_of_uniqueness(&set, proof, commitments, transcript_label, &pc_gens, &bp_gens).is_ok());
-        verify_proof_of_uniqueness(&set, proof, commitments, transcript_label, &pc_gens, &bp_gens).unwrap();
+        verify_proof_of_uniqueness(set.len(), proof, commitments, transcript_label, &pc_gens, &bp_gens).unwrap();
     }
 
     #[test]
@@ -221,6 +221,6 @@ mod tests {
 
         let (proof, commitments) = gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
         // Verification should fail, as now the set elements aren't unique
-        assert!(verify_proof_of_uniqueness(&set, proof, commitments, transcript_label, &pc_gens, &bp_gens).is_err());
+        assert!(verify_proof_of_uniqueness(set.len(), proof, commitments, transcript_label, &pc_gens, &bp_gens).is_err());
     }
 }
