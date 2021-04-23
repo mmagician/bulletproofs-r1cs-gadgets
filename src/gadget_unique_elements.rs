@@ -24,7 +24,7 @@ mod tests {
         n * (n + 1) / 2
     }
     
-    fn gen_proof_of_uniqueness<R: RngCore + CryptoRng>(set: &[u64], mut rng: &mut R, pc_gens: &PedersenGens, bp_gens: &BulletproofGens, transcript_label: &'static[u8]) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+    pub fn gen_proof_of_uniqueness<R: RngCore + CryptoRng>(set: &[u64], mut rng: &mut R, pc_gens: &PedersenGens, bp_gens: &BulletproofGens, transcript_label: &'static[u8]) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
             assert!(set.len() >= 1, "Can't work with empty sets!");
 
             let mut prover_transcript = Transcript::new(transcript_label);
@@ -98,7 +98,7 @@ mod tests {
             Ok((proof, commitments))
     }
 
-    fn verify_proof_of_uniqueness(set_length: usize, proof: R1CSProof, commitments: Vec<CompressedRistretto>, transcript_label: &'static[u8], pc_gens: &PedersenGens, bp_gens: &BulletproofGens) -> Result<(), R1CSError> {
+    pub fn verify_proof_of_uniqueness(set_length: usize, proof: R1CSProof, commitments: Vec<CompressedRistretto>, transcript_label: &'static[u8], pc_gens: &PedersenGens, bp_gens: &BulletproofGens) -> Result<(), R1CSError> {
 
         assert!(set_length >= 1, "Can't work with empty sets!");
         /// how many differences do we have?
