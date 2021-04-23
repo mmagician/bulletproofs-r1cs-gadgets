@@ -20,3 +20,4 @@ pub mod gadget_vsmt_4;
 pub mod gadget_osmt;    /// This is incomplete
 mod poseidon_constants;
 pub mod gadget_poseidon;
+pub mod gadget_unique_elements;
