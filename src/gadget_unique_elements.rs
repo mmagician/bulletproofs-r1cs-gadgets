@@ -25,6 +25,8 @@ mod tests {
     }
     
     fn gen_proof_of_uniqueness<R: RngCore + CryptoRng>(set: &[u64], mut rng: &mut R, pc_gens: &PedersenGens, bp_gens: &BulletproofGens, transcript_label: &'static[u8]) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+            assert!(set.len() >= 1, "Can't work with empty sets!");
+
             let mut prover_transcript = Transcript::new(transcript_label);
             let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
         
@@ -32,7 +34,6 @@ mod tests {
             let mut set_variables: Vec<Variable> = vec![];
             
             // First, create the commitments to the set elements
-        
             for i in 0..set.len() {
                 let element: Scalar = Scalar::from(set[i]);
                 let (com_elem, var_elem) = prover.commit(element, Scalar::random(&mut rng));
@@ -99,17 +100,22 @@ mod tests {
 
     fn verify_proof_of_uniqueness(set_length: usize, proof: R1CSProof, commitments: Vec<CompressedRistretto>, transcript_label: &'static[u8], pc_gens: &PedersenGens, bp_gens: &BulletproofGens) -> Result<(), R1CSError> {
 
+        assert!(set_length >= 1, "Can't work with empty sets!");
+        /// how many differences do we have?
+        /// For 1st element: n-1 differences
+        /// All the way down to (n-1)th element with 1 difference (see explanation in generation step)
+        /// That's a partial sum from 1 to n-1, in reverse order
+        let num_of_diff_commitments: usize = get_partial_sum(set_length - 1);
+
+        // The verifier didn't commit to the set length, but it's not actually needed
+        assert!(set_length + 2*num_of_diff_commitments == commitments.len());
+
         let mut verifier_transcript = Transcript::new(transcript_label);
         let mut verifier = Verifier::new(&mut verifier_transcript);
 
         // set element commitments, as many as the set itself
         let set_commitments = &commitments[0..set_length];
 
-        /// how many differences do we have? 
-        /// For 1st element: n-1 differences
-        /// All the way down to (n-1)th element with 1 difference (see explanation in generation step)
-        /// That's a partial sum from 1 to n-1, in reverse order
-        let num_of_diff_commitments: usize = get_partial_sum(set_length - 1);
 
         // diff commitments
         let diff_commitments = &commitments[set_length..set_length+num_of_diff_commitments];
@@ -117,31 +123,22 @@ mod tests {
         // diff inv commitments
         let diff_inv_commitments = &commitments[set_length+num_of_diff_commitments..];
 
-        assert!(diff_commitments.len() == diff_inv_commitments.len());
+        assert!(diff_commitments.len() == diff_inv_commitments.len(), "Ooops, differences & inverses vectors not equal!");
 
-        let mut var_elements = vec![];
+        let mut set_variables = vec![];
         for i in 0..set_length {
             let var_elem = verifier.commit(set_commitments[i]);
-            var_elements.push(var_elem);
+            set_variables.push(var_elem);
         }
 
-        let mut var_diffs = vec![];
-        let mut var_diffs_inv = vec![];
+        let mut diff_variables = vec![];
+        let mut diff_inv_variables = vec![];
 
         // But we also need to verify that the differences actually come from the set itself!
         for i in 0..set_length {
-            let allocated_current = AllocatedScalar {
-                variable: var_elements[i],
-                assignment: None
-            };
             for j in i+1..set_length {
-                let allocated_next = AllocatedScalar {
-                    variable: var_elements[j],
-                    assignment: None
-                };
-                
                 /// Some magic below
-                /// For each i, j elements, how to find the index in `var_diffs`?
+                /// For each i, j elements, how to find the index in `diff_variables`?
                 /// Full formula, disregarding jth position for now & assume `i` starts at 0
                 /// is basically a difference of two partial sums
                 /// This is needed, since the arithmetic progression is in reverse (n-1, n-2, ..., 1)
@@ -150,26 +147,19 @@ mod tests {
                 let i_pos = ((2*set_length - i - 1) * i) / 2;
                 /// now we add the offset for j:
                 let offset = j - i - 1;
-                /// and combine
                 let index = i_pos + offset;
                 println!("i: {}, j: {}, index: {}", i, j, index);
 
                 let var_diff = verifier.commit(diff_commitments[index]);
-                var_diffs.push(var_diff);
+                diff_variables.push(var_diff);
     
                 let var_diff_inv = verifier.commit(diff_inv_commitments[index]);
-                var_diffs_inv.push(var_diff_inv);
+                diff_inv_variables.push(var_diff_inv);
                 
-                
-                // TODO we've already defined these in the above loop, could be re-used
-                let allocated_diff = AllocatedScalar {
-                    variable: var_diffs[index],
-                    assignment: None
-                };
                 // Diffs are supposed to be: `diff` = `current_set_element` - `next_set_element`
                 // So we require `diff` + `next_set_element` == `current_set_element`
                 // (and check it for all elements of the set with every other element, hence the double loop)
-                let set_lc: LinearCombination = vec![(allocated_diff.variable, Scalar::one()), (allocated_next.variable, Scalar::one()), (allocated_current.variable, -Scalar::one())].iter().collect();
+                let set_lc: LinearCombination = vec![(var_diff, Scalar::one()), (set_variables[j], Scalar::one()), (set_variables[i], -Scalar::one())].iter().collect();
                 verifier.constrain(set_lc);
             }
         }
@@ -177,12 +167,12 @@ mod tests {
         for i in 0..num_of_diff_commitments {
 
             let allocated_diff = AllocatedScalar {
-                variable: var_diffs[i],
+                variable: diff_variables[i],
                 assignment: None
             };
 
             let allocated_diff_inv = AllocatedScalar { 
-                variable: var_diffs_inv[i],
+                variable: diff_inv_variables[i],
                 assignment: None
             };
 
@@ -192,19 +182,19 @@ mod tests {
     }
 
 
+    /// Create a proof that we have a set whose elements are all unique
     #[test]
     fn test_unique_elements() {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(128, 1);
-        // Prove knowledge that all elements of the vector are unique, i.e. that we have a set
-        
         let mut rng = rand::thread_rng();
         let transcript_label = b"FactorsUnique";
 
         let set: Vec<u64> = vec![2, 3, 5, 6, 10];
 
+        // Note, that we're not commmitting to the length of the set
+        // Instead, given the set.len() together with committments vector, the verifier can check the correctness as the lengths are related 
         let (proof, commitments) = gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
-        // assert!(verify_proof_of_uniqueness(&set, proof, commitments, transcript_label, &pc_gens, &bp_gens).is_ok());
         verify_proof_of_uniqueness(set.len(), proof, commitments, transcript_label, &pc_gens, &bp_gens).unwrap();
     }
 
@@ -212,8 +202,6 @@ mod tests {
     fn test_repeated_elements() {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(128, 1);
-        // Prove knowledge that all elements of the vector are unique, i.e. that we have a set
-        
         let mut rng = rand::thread_rng();
         let transcript_label = b"FactorsRepeated";
 
@@ -222,5 +210,19 @@ mod tests {
         let (proof, commitments) = gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
         // Verification should fail, as now the set elements aren't unique
         assert!(verify_proof_of_uniqueness(set.len(), proof, commitments, transcript_label, &pc_gens, &bp_gens).is_err());
+    }
+
+    /// The test doesn't make much sense, but the prover & verifier should be able to handle it anyway
+    #[test]
+    fn test_only_one_element() {
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(128, 1);
+        let mut rng = rand::thread_rng();
+        let transcript_label = b"FactorsRepeated";
+
+        let set: Vec<u64> = vec![3];
+
+        let (proof, commitments) = gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
+        assert!(verify_proof_of_uniqueness(set.len(), proof, commitments, transcript_label, &pc_gens, &bp_gens).is_ok());
     }
 }
