@@ -221,7 +221,7 @@ mod tests {
         // Instead, given the set.len() together with committments vector, the verifier can check the correctness as the lengths are related
         let (proof, commitments) =
             gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
-        verify_proof_of_uniqueness(
+        assert!(verify_proof_of_uniqueness(
             set.len(),
             proof,
             commitments,
@@ -229,7 +229,7 @@ mod tests {
             &pc_gens,
             &bp_gens,
         )
-        .unwrap();
+        .is_ok());
     }
 
     #[test]
