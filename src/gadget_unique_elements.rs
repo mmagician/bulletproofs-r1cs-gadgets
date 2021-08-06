@@ -47,14 +47,14 @@ mod tests {
             set_variables.push(var_elem);
         }
 
-        /// The following vectors will contain the following elements:
-        /// [1st-2nd, 1st-3rd, ..., 2nd-3rd, ..., (n-1)th-nth]
-        /// there are total of
-        /// n-1 differences for the 1st element
-        /// n-2 differences for the 2nd element
-        /// ...
-        /// 1 difference for the (n-1)th element
-        /// nothing left for the nth element, since it was already accounted for in all previous steps
+        // The following vectors will contain the following elements:
+        // [1st-2nd, 1st-3rd, ..., 2nd-3rd, ..., (n-1)th-nth]
+        // there are total of
+        // n-1 differences for the 1st element
+        // n-2 differences for the 2nd element
+        // ...
+        // 1 difference for the (n-1)th element
+        // nothing left for the nth element, since it was already accounted for in all previous steps
         let mut diff_commitments = vec![];
         let mut diff_variables: Vec<Variable> = vec![];
         let mut diff_inv_commitments = vec![];
@@ -120,10 +120,10 @@ mod tests {
         bp_gens: &BulletproofGens,
     ) -> Result<(), R1CSError> {
         assert!(set_length >= 1, "Can't work with empty sets!");
-        /// how many differences do we have?
-        /// For 1st element: n-1 differences
-        /// All the way down to (n-1)th element with 1 difference (see explanation in generation step)
-        /// That's a partial sum from 1 to n-1, in reverse order
+        // how many differences do we have?
+        // For 1st element: n-1 differences
+        // All the way down to (n-1)th element with 1 difference (see explanation in generation step)
+        // That's a partial sum from 1 to n-1, in reverse order
         let num_of_diff_commitments: usize = get_partial_sum(set_length - 1);
 
         // The verifier didn't commit to the set length, but it's not actually needed
@@ -158,15 +158,15 @@ mod tests {
         // But we also need to verify that the differences actually come from the set itself!
         for i in 0..set_length {
             for j in i + 1..set_length {
-                /// Some magic below
-                /// For each i, j elements, how to find the index in `diff_variables`?
-                /// Full formula, disregarding jth position for now & assume `i` starts at 0
-                /// is basically a difference of two partial sums
-                /// This is needed, since the arithmetic progression is in reverse (n-1, n-2, ..., 1)
-                /// [ n*(n-1) - (n-i)*(n-i-1) ] / 2
-                /// This gives the position where differences for i'th element start
+                // Some magic below
+                // For each i, j elements, how to find the index in `diff_variables`?
+                // Full formula, disregarding jth position for now & assume `i` starts at 0
+                // is basically a difference of two partial sums
+                // This is needed, since the arithmetic progression is in reverse (n-1, n-2, ..., 1)
+                // [ n*(n-1) - (n-i)*(n-i-1) ] / 2
+                // This gives the position where differences for i'th element start
                 let i_pos = ((2 * set_length - i - 1) * i) / 2;
-                /// now we add the offset for j:
+                // now we add the offset for j:
                 let offset = j - i - 1;
                 let index = i_pos + offset;
                 println!("i: {}, j: {}, index: {}", i, j, index);
