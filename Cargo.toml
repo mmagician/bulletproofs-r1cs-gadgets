@@ -5,7 +5,7 @@ authors = ["lovesh harchandani <lovesh.bond@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
+curve25519-dalek = { version = "3", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 digest = { version = "0.8", default-features = false }
@@ -20,10 +20,9 @@ clear_on_drop = { version = "0.2", default-features = false, features = ["nightl
 failure = "0.1"
 
 [dependencies.bulletproofs]
-#path = "../bulletproofs"
-git = "https://github.com/lovesh/bulletproofs"
-branch = "smt"
+git = "https://github.com/webb-tools/bulletproofs"
 features = ["std", "avx2_backend", "yoloproofs"]
+package = "webb-bulletproofs"
 
 [dev-dependencies]
 hex = "0.3"
