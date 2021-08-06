@@ -256,6 +256,53 @@ mod tests {
         )
         .is_err());
     }
+    #[test]
+    fn test_different_sets() {
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(128, 1);
+        let mut rng = rand::thread_rng();
+        let transcript_label = b"FactorsRepeated";
+
+        let set_1: Vec<u64> = vec![2, 3, 4];
+        let set_2: Vec<u64> = vec![2, 3, 5];
+
+        let (proof_1, commitments_1) =
+            gen_proof_of_uniqueness(&set_1, &mut rng, &pc_gens, &bp_gens, transcript_label)
+                .unwrap();
+        let (proof_2, commitments_2) =
+            gen_proof_of_uniqueness(&set_2, &mut rng, &pc_gens, &bp_gens, transcript_label)
+                .unwrap();
+        // Proof for set_1 should verify
+        assert!(verify_proof_of_uniqueness(
+            set_1.len(),
+            proof_1.clone(),
+            commitments_1.clone(),
+            transcript_label,
+            &pc_gens,
+            &bp_gens
+        )
+        .is_ok());
+        // Proof for set_2 should verify
+        assert!(verify_proof_of_uniqueness(
+            set_1.len(),
+            proof_2.clone(),
+            commitments_2.clone(),
+            transcript_label,
+            &pc_gens,
+            &bp_gens
+        )
+        .is_ok());
+        // Verification should fail, as now the proof corresponds to different committments
+        assert!(verify_proof_of_uniqueness(
+            set_1.len(),
+            proof_1,
+            commitments_2,
+            transcript_label,
+            &pc_gens,
+            &bp_gens
+        )
+        .is_err());
+    }
 
     /// The test doesn't make much sense, but the prover & verifier should be able to handle it anyway
     #[test]
