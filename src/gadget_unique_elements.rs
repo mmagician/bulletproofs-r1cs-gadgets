@@ -233,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_repeated_elements() {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(128, 1);
@@ -241,6 +242,7 @@ mod tests {
 
         let set: Vec<u64> = vec![2, 3, 3];
 
+        // Test should panic here, since it shouldn't be possible to create an incorrect proof
         let (proof, commitments) =
             gen_proof_of_uniqueness(&set, &mut rng, &pc_gens, &bp_gens, transcript_label).unwrap();
         // Verification should fail, as now the set elements aren't unique
